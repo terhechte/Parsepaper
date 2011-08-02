@@ -1,0 +1,156 @@
+#!/usr/bin/ruby
+#parsepaper.rb
+
+require 'optparse'
+
+
+class ParseArguments < Hash
+  def initialize(args)
+    super()
+    self[:commit_message] = ''
+    self[:mode] = :status
+    self[:ticket_numbers] = nil
+    self[:taskpaper_file] = 'todo.taskpaper'
+
+    self[:possible_modes] = [:decorate, :commit, :status, :auto]
+
+    opts = OptionParser.new do |opts|
+      opts.banner = "Usage: #$0 (decorate|commit|status|auto) [options]\
+      decorate: add ticket numbers to the taskpaper file
+      commit: take all tasks that are @done and commit them
+      status: show what would be commited
+      auto: first decorate the file, then if something is done, commit it."
+
+      opts.on('-m', '--message [STRING]', 'add commit message [STRING]') do |string|
+        self[:commit_message] = string || ""
+      end
+
+      opts.on('-t', '--tickets x,y,z', 'list of tickets to commit') do |list|
+        self[:ticket_numbers] = list.collect{ |ticket| 
+          if ticket[0]=='#':
+            return ticket
+          end
+        }
+      end
+
+      opts.on('-f', '--taskpaper [TASKPAPERFILE]', 'chose a custom taskpaper file. default is todo.taskpaper') do |string|
+        self[:taskpaper_file] = string 
+      end
+
+      opts.on('-h', '--help', 'display this help and exit') do
+        puts opts
+        exit
+      end
+
+    end
+
+    #first, parse the arguments
+    opts.parse!(args)
+
+    #check if the actual mode is known
+    if args.size>1
+      puts "Please provide only one mode"
+      exit
+    end
+
+    if args.size==0
+      puts "Please provide a mode"
+      exit
+    end
+    mode = args.first
+
+    if self[:possible_modes].index(mode.to_sym).nil?
+        puts "Unknown mode #{mode}"
+        exit
+    end
+    self[:mode] = mode.to_sym
+ end
+end
+
+class Parsepaper
+    def initialize(arguments)
+        @args = arguments
+
+        #this contains all the tickets in the file, so we don't issue a ticket
+        #twice
+        @tickets = []
+
+        # Check if the taskpaper_file exists.
+        if !File.file? @args[:taskpaper_file]
+          puts "Couldn't find #{@args[:taskpaper_file]}"
+          exit
+        end
+
+        #and see what we should do...
+        if not self.respond_to?(@args[:mode].to_s)
+          puts "Unknown action: " << @args[:mode].to_s
+        end
+    end
+
+    def run
+        puts 'actoin: ' << @args[:mode].to_s
+        self.send(@args[:mode].to_s)
+    end
+
+    def generateTicket
+      #tickets have 4 numbers
+      begin
+        number = "#{rand(9999)}"
+      end while not @tickets.index(number).nil?
+      return number
+    end
+
+    def decorate
+      # Run through the file, one line at a time, and decorate it, if
+      # necessary
+      outputLines = []
+      open(@args[:taskpaper_file]).each{ |line|
+        #if the line just contains whitespace or just a -, just add it
+        if line.strip.size<=1
+          outputLines << line.strip
+        #if we have a project
+        elsif line.strip[-1,1]==":":
+          outputLines << line.strip
+        #if we don't have a done and don't have a ticket, add one
+        elsif !/\@done/.match(line) and !/\#[0-9]{1,4}/.match(line)
+          ticket = self.generateTicket.strip
+          outputLines << "#{line.strip} \##{ticket}"
+
+          #and save the ticket number, of course
+          @tickets << ticket
+
+        #if we have a ticket number, take it
+        elsif /\#[0-9]{1,4}/.match(line)
+          #we wanna save the ticket
+          @tickets << /\#([0-9]{1,4})/.match(line)[0]
+
+          outputLines << line.strip
+        #other than that, just add the line
+        else
+          outputLines << line.strip
+        end
+      }
+
+      #and write the outputlines back into the file.
+      open(@args[:taskpaper_file], 'w') do |file|
+        outputLines.each{ |line| file << line << "\n" } 
+      end
+    end
+
+    def status
+
+    end
+
+    def commit
+
+    end
+end
+
+
+#and run it
+
+args = ParseArguments.new(ARGV)
+
+parsePaper = Parsepaper.new(args)
+parsePaper.run
+
