@@ -67,19 +67,78 @@ class ParseArguments < Hash
  end
 end
 
+class Task
+  #get information about this line, i.e. is it done, does it have a ticket, etc
+  attr_accessor :ticket
+  attr_accessor :line
+  attr_accessor :done
+  alias_method :done?, :done
+  attr_accessor :whitespace
+  alias_method :whitespace?, :whitespace
+  attr_accessor :project
+  alias_method :project?, :project
+  def initialize(line)
+    @line = line.strip
+    @ticket = nil
+    if /\#[0-9]{1,4}/.match(@line)
+      @ticket = /\#([0-9]{1,4})/.match(@line)[1]
+      # and remove the ticket from the line. we will add it again later on
+      # this means that tickes are always at the end of the line, which is
+      # expected behaviour / a feature
+      @line.gsub!(/\ ?\#([0-9]{1,4})/, "")
+    end
+    @done =  !/\@done/.match(@line).nil?
+
+    @project = false
+    if @line[-1,1]==":"
+      @project = true
+    end
+
+    @whitespace = false
+    if @line.size<=1
+      @whitespace = true
+    end
+  end
+
+  def decoratedLine
+    #decorate the line with the ticket
+    if @ticket.nil?
+      return @line
+    else
+      return "#{@line} \##{@ticket}"
+    end
+  end
+
+  def ticket?
+    return @ticket!=nil
+  end
+
+end
+
 class Parsepaper
     def initialize(arguments)
         @args = arguments
 
-        #this contains all the tickets in the file, so we don't issue a ticket
-        #twice
-        @tickets = []
 
         # Check if the taskpaper_file exists.
         if !File.file? @args[:taskpaper_file]
           puts "Couldn't find #{@args[:taskpaper_file]}"
           exit
         end
+
+        # Read the file, fill the ticket numbers, create the dict, and the array
+        @lines = []
+        #this contains all the tickets in the file, so we don't issue a ticket twice
+        @tickets = {}
+
+        open(@args[:taskpaper_file]).each{ |line|
+          #if the line just contains whitespace or just a -, just add it
+          taskInstance = Task.new(line)
+          if taskInstance.ticket?
+            @tickets[taskInstance.ticket] = taskInstance
+          end
+          @lines << taskInstance
+        }
 
         #and see what we should do...
         if not self.respond_to?(@args[:mode].to_s)
@@ -88,57 +147,46 @@ class Parsepaper
     end
 
     def run
-        puts 'actoin: ' << @args[:mode].to_s
         self.send(@args[:mode].to_s)
     end
 
+    #generate a ticket
     def generateTicket
       #tickets have 4 numbers
       begin
         number = "#{rand(9999)}"
       end while not @tickets.index(number).nil?
-      return number
+      return number.strip
+    end
+
+    #generate an array of all changes that would be commited
+    def arrayOfChanges
+      #we could also use Ruby/Git here, but that feels like an overkill right #now.
+      gitChanges = `git diff #{@args[:taskpaper_file]} | grep '^\+' | grep -i '\@done'`
+      puts gitChanges.split("\n")
+    end
+
+    def save
+      #and write the outputlines back into the file.
+      open(@args[:taskpaper_file], 'w') do |file|
+        @lines.each{ |taskInstance| file << taskInstance.decoratedLine << "\n" } 
+      end
     end
 
     def decorate
       # Run through the file, one line at a time, and decorate it, if
-      # necessary
-      outputLines = []
-      open(@args[:taskpaper_file]).each{ |line|
-        #if the line just contains whitespace or just a -, just add it
-        if line.strip.size<=1
-          outputLines << line.strip
-        #if we have a project
-        elsif line.strip[-1,1]==":":
-          outputLines << line.strip
-        #if we don't have a done and don't have a ticket, add one
-        elsif !/\@done/.match(line) and !/\#[0-9]{1,4}/.match(line)
-          ticket = self.generateTicket.strip
-          outputLines << "#{line.strip} \##{ticket}"
-
-          #and save the ticket number, of course
-          @tickets << ticket
-
-        #if we have a ticket number, take it
-        elsif /\#[0-9]{1,4}/.match(line)
-          #we wanna save the ticket
-          @tickets << /\#([0-9]{1,4})/.match(line)[0]
-
-          outputLines << line.strip
-        #other than that, just add the line
-        else
-          outputLines << line.strip
+      @lines.each{ |ti|
+        if !ti.whitespace? and !ti.project? and !ti.done? and !ti.ticket?
+          ticket = self.generateTicket
+          ti.ticket = ticket
+          @tickets[ti.ticket] = ti
         end
       }
-
-      #and write the outputlines back into the file.
-      open(@args[:taskpaper_file], 'w') do |file|
-        outputLines.each{ |line| file << line << "\n" } 
-      end
+      self.save
     end
 
     def status
-
+      self.arrayOfChanges
     end
 
     def commit

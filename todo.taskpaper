@@ -1,11 +1,11 @@
 Example:
-		- fix issue 1
-		- fix issue 2
-		- fix issue 3 @done
-		- fix issue 4 @testing
+- fix issue 1 @done
+- fix issue 2 @done
+- fix issue 3 @done
+- fix issue 4 @testing #903
 
 ParsePaper:
-		- implement the status mode
-		- implement the commit mode
-		- implement the auto mode
-		- make sure all the command line switches work
+- implement the status mode #6186
+- implement the commit mode #5722
+- implement the auto mode #1825
+- make sure all the command line switches work #853
