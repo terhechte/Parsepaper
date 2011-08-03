@@ -3,6 +3,8 @@ Example:
 - fix issue 2 @done
 - fix issue 3 @done
 - fix issue 4 @testing #903
+- fix issue 5 @done #7568
+- fix issue 6 @done #5905
 
 ParsePaper:
 - implement the status mode #6186

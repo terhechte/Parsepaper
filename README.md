@@ -20,3 +20,7 @@ That's what parsepaper is for. It does two things:
     2. When you fixed stuff (@done) you can run parsepaper with the ticket numbers that you just finished, and it will do a git commit for you, setting the ticket number and the ticket contents into the commit log (+ anything else you give parsepaper via the -m flag.
     3. When you are sure that your taskpaper file is absolutely flawless, and you just @done'ed some flags, then you can just let parsepaper do the commit for you based on all the changes in the taskpaper file that it can gather from git diff.
 
+Caveats:
+parsepaper will alwys do a commit -a. There's no easy way to find out which
+files should be commited. If you need that behaviour pipe the parsepaper status
+output to git commit.

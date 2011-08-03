@@ -60,17 +60,20 @@ class ParseArguments < Hash
     #check if the actual mode is known
     if args.size>1
       puts "Please provide only one mode"
+      puts opts
       exit
     end
 
     if args.size==0
       puts "Please provide a mode"
+      puts opts
       exit
     end
     mode = args.first
 
     if self[:possible_modes].index(mode.to_sym).nil?
         puts "Unknown mode #{mode}"
+        puts opts
         exit
     end
     self[:mode] = mode.to_sym
@@ -117,7 +120,8 @@ class Task
   def description
     # return the descrition of this ticket
     # means, we strip the - and the done
-    return @line.mgsub([[/^\-/, ""], [/\ ?\@done/i, ""]])
+    desc = "Ticket: #{@ticket}\t\tStatus: #{'Done' if @done}"
+    return desc << "\n " << @line.mgsub([[/^\-/, ""], [/\ ?\@done/i, ""]]) 
   end
 
 end
@@ -195,13 +199,33 @@ class Parsepaper
       puts "The following changes would be commited"
       puts ""
       self.arrayOfChanges.each{ |ti|
-        puts "Ticket: #{ti.ticket}\t\tStatus: #{'Done' if ti.done?}"
-        puts " " << ti.description
-        puts ""
+        puts ti.description << "\n\n"
       }
     end
 
     def commit
+      #if we have additional commit info, we append it
+      commitMessage = @args[:commit_message].size>0 ? @args[:commit_message] + "\n\n" : ""
+
+      self.arrayOfChanges.each{ |ti|
+        commitMessage << ti.description << "\n"
+      }
+
+      command = '/usr/bin/env git commit -a --file=-'
+
+      result = nil
+      IO.popen(command, mode='r+') do |io| 
+          io.write commitMessage
+          io.close_write # let the process know you've given it all the data 
+          result = io.read 
+      end
+
+      if result.nil?
+        puts "Error, couldn't commit"
+        exit
+      end
+
+      puts "Result is: " << result
 
     end
 end
