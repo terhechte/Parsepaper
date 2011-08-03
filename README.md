@@ -1,6 +1,8 @@
 ## ParsePaper
 
-ParsePaper will help you to commit project changes to git if you keep all your
+Link Taskpaper files with Git commit so that commit messages automatically include the @done tasks from the task paper file.
+
+This will help you to commit project changes to git if you keep all your
 tasks in a simple todo list textfile (typically a taskpaper file)
 
 ## Example
