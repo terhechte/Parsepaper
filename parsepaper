@@ -35,10 +35,10 @@ class ParseArguments < Hash
         self[:commit_message] = string || ""
       end
 
-      opts.on('-t', '--tickets x,y,z', 'list of tickets to commit') do |list|
+      opts.on('--tickets x,y,z', Array, 'list of tickets to commit') do |list|
         self[:ticket_numbers] = list.collect{ |ticket| 
-          if ticket[0]=='#':
-            return ticket
+          if ticket =~ /^\#/:
+            ticket.gsub(/^\#/,'')
           end
         }
       end
@@ -207,7 +207,11 @@ class Parsepaper
       #if we have additional commit info, we append it
       commitMessage = @args[:commit_message].size>0 ? @args[:commit_message] + "\n\n" : ""
 
+      #if we're only allowed to cmmit sommit tickets, we need to prepare that here.
+      allTickets = @args[:ticket_numbers].nil?
+
       self.arrayOfChanges.each{ |ti|
+        next if not allTickets and @args[:ticket_numbers].index(ti.ticket).nil?
         commitMessage << ti.description << "\n"
       }
 
@@ -225,7 +229,7 @@ class Parsepaper
         exit
       end
 
-      puts "Result is: " << result
+      puts "Git said: " << result
 
     end
 end
