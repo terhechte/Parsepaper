@@ -20,6 +20,7 @@ class ParseArguments < Hash
     self[:commit_message] = ''
     self[:mode] = :status
     self[:ticket_numbers] = nil
+    self[:force] = false
     self[:taskpaper_file] = 'todo.taskpaper'
 
     self[:possible_modes] = [:decorate, :commit, :status, :auto]
@@ -43,8 +44,12 @@ class ParseArguments < Hash
         }
       end
 
-      opts.on('-f', '--taskpaper [TASKPAPERFILE]', 'chose a custom taskpaper file. default is todo.taskpaper') do |string|
+      opts.on('-t', '--taskpaper [TASKPAPERFILE]', 'chose a custom taskpaper file. default is todo.taskpaper') do |string|
         self[:taskpaper_file] = string 
+      end
+
+      opts.on('-f', '--force', 'in auto mode, force commit, and do not ask for approval') do
+        self[:force] = true
       end
 
       opts.on('-h', '--help', 'display this help and exit') do
@@ -231,6 +236,37 @@ class Parsepaper
 
       puts "Git said: " << result
 
+    end
+
+    def auto
+      #auto mode is pretty easy and operates on the well establised modes above
+      #it should be the default since it offers the least possibilities of 
+      #shooting yourself into the foot.
+
+      #before we do anything, we decorate, so that all the new tickets get a valid number.
+      self.decorate
+
+      if self.arrayOfChanges.size == 0
+        puts "No changes to commit"
+        exit
+      end
+
+      # then we show the user what we want to do, if he lets us.
+      if not @args[:force]
+        puts "Commit Preview:"
+        self.status
+
+        print "Proceed? (y/n) "
+        answer = $stdin.gets
+
+        # default is y
+        if answer.strip == "n"
+          exit
+        end
+      end
+
+      # now, that we're done, we can commit
+      self.commit
     end
 end
 
