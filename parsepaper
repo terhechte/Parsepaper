@@ -3,7 +3,17 @@
 
 require 'optparse'
 
+#extend string to have mgsub
+class String
+  def mgsub(key_value_pairs=[].freeze)
+    regexp_fragments = key_value_pairs.collect { |k,v| k }
+    gsub(Regexp.union(*regexp_fragments)) do |match|
+           key_value_pairs.detect{|k,v| k =~ match}[1]
+    end
+  end
+end
 
+#parse our arguments
 class ParseArguments < Hash
   def initialize(args)
     super()
@@ -69,13 +79,10 @@ end
 
 class Task
   #get information about this line, i.e. is it done, does it have a ticket, etc
-  attr_accessor :ticket
-  attr_accessor :line
-  attr_accessor :done
+  attr_accessor :ticket, :line, :done, :whitespace, :project
+  #we want to have ? accessors
   alias_method :done?, :done
-  attr_accessor :whitespace
   alias_method :whitespace?, :whitespace
-  attr_accessor :project
   alias_method :project?, :project
   def initialize(line)
     @line = line.strip
@@ -87,17 +94,11 @@ class Task
       # expected behaviour / a feature
       @line.gsub!(/\ ?\#([0-9]{1,4})/, "")
     end
-    @done =  !/\@done/.match(@line).nil?
+    @done =  !/\@done/i.match(@line).nil?
 
-    @project = false
-    if @line[-1,1]==":"
-      @project = true
-    end
+    @project = @line[-1,1]==":"
 
-    @whitespace = false
-    if @line.size<=1
-      @whitespace = true
-    end
+    @whitespace =  @line.size<=1
   end
 
   def decoratedLine
@@ -113,12 +114,17 @@ class Task
     return @ticket!=nil
   end
 
+  def description
+    # return the descrition of this ticket
+    # means, we strip the - and the done
+    return @line.mgsub([[/^\-/, ""], [/\ ?\@done/i, ""]])
+  end
+
 end
 
 class Parsepaper
     def initialize(arguments)
         @args = arguments
-
 
         # Check if the taskpaper_file exists.
         if !File.file? @args[:taskpaper_file]
@@ -163,7 +169,7 @@ class Parsepaper
     def arrayOfChanges
       #we could also use Ruby/Git here, but that feels like an overkill right #now.
       gitChanges = `git diff #{@args[:taskpaper_file]} | grep '^\+' | grep -i '\@done'`
-      puts gitChanges.split("\n")
+      return gitChanges.split("\n").collect{ |line| Task.new(line.gsub(/^\+\ ?/, ""))}
     end
 
     def save
@@ -186,7 +192,13 @@ class Parsepaper
     end
 
     def status
-      self.arrayOfChanges
+      puts "The following changes would be commited"
+      puts ""
+      self.arrayOfChanges.each{ |ti|
+        puts "Ticket: #{ti.ticket}\t\tStatus: #{'Done' if ti.done?}"
+        puts " " << ti.description
+        puts ""
+      }
     end
 
     def commit
