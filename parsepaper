@@ -1,7 +1,10 @@
 #!/usr/bin/ruby
 #parsepaper.rb
 
+#Benedikt Terhechte (stylemac.com)
+
 require 'optparse'
+
 
 #extend string to have mgsub
 class String
@@ -18,7 +21,7 @@ class ParseArguments < Hash
   def initialize(args)
     super()
     self[:commit_message] = ''
-    self[:mode] = :status
+    self[:mode] = :auto
     self[:ticket_numbers] = nil
     self[:force] = false
     self[:taskpaper_file] = 'todo.taskpaper'
@@ -132,149 +135,153 @@ class Task
 end
 
 class Parsepaper
-    def initialize(arguments)
-        @args = arguments
-
-        # Check if the taskpaper_file exists.
-        if !File.file? @args[:taskpaper_file]
-          puts "Couldn't find #{@args[:taskpaper_file]}"
-          exit
-        end
-
-        # Read the file, fill the ticket numbers, create the dict, and the array
-        @lines = []
-        #this contains all the tickets in the file, so we don't issue a ticket twice
-        @tickets = {}
-
-        open(@args[:taskpaper_file]).each{ |line|
-          #if the line just contains whitespace or just a -, just add it
-          taskInstance = Task.new(line)
-          if taskInstance.ticket?
-            @tickets[taskInstance.ticket] = taskInstance
-          end
-          @lines << taskInstance
-        }
-
-        #and see what we should do...
-        if not self.respond_to?(@args[:mode].to_s)
-          puts "Unknown action: " << @args[:mode].to_s
-        end
+  def initialize(arguments)
+    @args = arguments
+    
+    # Check if the taskpaper_file exists.
+    if !File.file? @args[:taskpaper_file]
+      puts "Couldn't find #{@args[:taskpaper_file]}"
+      exit
     end
-
-    def run
-        self.send(@args[:mode].to_s)
-    end
-
-    #generate a ticket
-    def generateTicket
-      #tickets have 4 numbers
-      begin
-        number = "#{rand(9999)}"
-      end while not @tickets.index(number).nil?
-      return number.strip
-    end
-
-    #generate an array of all changes that would be commited
-    def arrayOfChanges
-      #we could also use Ruby/Git here, but that feels like an overkill right #now.
-      gitChanges = `git diff #{@args[:taskpaper_file]} | grep '^\+' | grep -i '\@done'`
-      return gitChanges.split("\n").collect{ |line| Task.new(line.gsub(/^\+\ ?/, ""))}
-    end
-
-    def save
-      #and write the outputlines back into the file.
-      open(@args[:taskpaper_file], 'w') do |file|
-        @lines.each{ |taskInstance| file << taskInstance.decoratedLine << "\n" } 
+    
+    # Read the file, fill the ticket numbers, create the dict, and the array
+    @lines = []
+    #this contains all the tickets in the file, so we don't issue a ticket twice
+    @tickets = {}
+    
+    open(@args[:taskpaper_file]).each{ |line|
+      #if the line just contains whitespace or just a -, just add it
+      taskInstance = Task.new(line)
+      if taskInstance.ticket?
+        @tickets[taskInstance.ticket] = taskInstance
       end
+      @lines << taskInstance
+    }
+    
+    #and see what we should do...
+    if not self.respond_to?(@args[:mode].to_s)
+      puts "Unknown action: " << @args[:mode].to_s
     end
+  end
 
-    def decorate
-      # Run through the file, one line at a time, and decorate it, if
-      @lines.each{ |ti|
-        if !ti.whitespace? and !ti.project? and !ti.done? and !ti.ticket?
-          ticket = self.generateTicket
-          ti.ticket = ticket
-          @tickets[ti.ticket] = ti
-        end
-      }
-      self.save
+  def run
+    self.send(@args[:mode].to_s)
+  end
+
+  #generate a ticket
+  def generateTicket
+    #tickets have 4 numbers
+    begin
+      number = "#{rand(9999)}"
+    end while not @tickets.index(number).nil?
+    return number.strip
+  end
+
+  #generate an array of all changes that would be commited
+  def arrayOfChanges
+    #we could also use Ruby/Git here, but that feels like an overkill right #now.
+    gitChanges = `git diff #{@args[:taskpaper_file]} | grep '^\+' | grep -i '\@done'`
+    return gitChanges.split("\n").collect{ |line| Task.new(line.gsub(/^\+\ ?/, ""))}
+  end
+
+  def save
+    #and write the outputlines back into the file.
+    open(@args[:taskpaper_file], 'w') do |file|
+      @lines.each{ |taskInstance| file << taskInstance.decoratedLine << "\n" } 
     end
+  end
 
-    def status
-      puts "The following changes would be commited"
-      puts ""
-      self.arrayOfChanges.each{ |ti|
-        puts ti.description << "\n\n"
-      }
-    end
-
-    def commit
-      #if we have additional commit info, we append it
-      commitMessage = @args[:commit_message].size>0 ? @args[:commit_message] + "\n\n" : ""
-
-      #if we're only allowed to cmmit sommit tickets, we need to prepare that here.
-      allTickets = @args[:ticket_numbers].nil?
-
-      self.arrayOfChanges.each{ |ti|
-        next if not allTickets and @args[:ticket_numbers].index(ti.ticket).nil?
-        commitMessage << ti.description << "\n"
-      }
-
-      command = '/usr/bin/env git commit -a --file=-'
-
-      result = nil
-      IO.popen(command, mode='r+') do |io| 
-          io.write commitMessage
-          io.close_write # let the process know you've given it all the data 
-          result = io.read 
+  def decorate
+    # Run through the file, one line at a time, and decorate it, if
+    @lines.each{ |ti|
+      if !ti.whitespace? and !ti.project? and !ti.done? and !ti.ticket?
+        ticket = self.generateTicket
+        ti.ticket = ticket
+        @tickets[ti.ticket] = ti
       end
+    }
+    self.save
+  end
 
-      if result.nil?
-        puts "Error, couldn't commit"
+  def status
+    puts "The following changes would be commited"
+    puts ""
+    self.arrayOfChanges.each{ |ti|
+      puts ti.description << "\n\n"
+    }
+  end
+
+  def commit
+    #if we have additional commit info, we append it
+    commitMessage = @args[:commit_message].size>0 ? @args[:commit_message] + "\n\n" : ""
+
+    #if we're only allowed to cmmit sommit tickets, we need to prepare that here.
+    allTickets = @args[:ticket_numbers].nil?
+
+    self.arrayOfChanges.each{ |ti|
+      next if not allTickets and @args[:ticket_numbers].index(ti.ticket).nil?
+      commitMessage << ti.description << "\n"
+    }
+
+    command = '/usr/bin/env git commit -a --file=-'
+
+    result = nil
+    IO.popen(command, mode='r+') do |io| 
+      io.write commitMessage
+      io.close_write # let the process know you've given it all the data 
+      result = io.read 
+    end
+
+    if result.nil?
+      puts "Error, couldn't commit"
+      exit
+    end
+
+    puts "Git said: " << result
+
+  end
+
+  def auto
+    #auto mode is pretty easy and operates on the well establised modes above
+    #it should be the default since it offers the least possibilities of 
+    #shooting yourself into the foot.
+
+    #before we do anything, we decorate, so that all the new tickets get a valid number.
+    self.decorate
+
+    if self.arrayOfChanges.size == 0
+      puts "No changes to commit"
+      exit
+    end
+
+    # then we show the user what we want to do, if he lets us.
+    if not @args[:force]
+      puts "Commit Preview:"
+      self.status
+
+      print "Proceed? (y/n) "
+      answer = $stdin.gets
+
+      # default is y
+      if answer.strip == "n"
         exit
       end
-
-      puts "Git said: " << result
-
     end
 
-    def auto
-      #auto mode is pretty easy and operates on the well establised modes above
-      #it should be the default since it offers the least possibilities of 
-      #shooting yourself into the foot.
-
-      #before we do anything, we decorate, so that all the new tickets get a valid number.
-      self.decorate
-
-      if self.arrayOfChanges.size == 0
-        puts "No changes to commit"
-        exit
-      end
-
-      # then we show the user what we want to do, if he lets us.
-      if not @args[:force]
-        puts "Commit Preview:"
-        self.status
-
-        print "Proceed? (y/n) "
-        answer = $stdin.gets
-
-        # default is y
-        if answer.strip == "n"
-          exit
-        end
-      end
-
-      # now, that we're done, we can commit
-      self.commit
-    end
+    # now, that we're done, we can commit
+    self.commit
+  end
 end
 
 
-#and run it
+# Finally, run the script
 
+# Parse the commandline
 args = ParseArguments.new(ARGV)
 
+# Hand the options to the parser
 parsePaper = Parsepaper.new(args)
+
+# Run it
 parsePaper.run
 
