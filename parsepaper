@@ -144,6 +144,15 @@ class Parsepaper
       exit
     end
     
+    self.readTickets
+    
+    #and see what we should do...
+    if not self.respond_to?(@args[:mode].to_s)
+      puts "Unknown action: " << @args[:mode].to_s
+    end
+  end
+
+  def readTickets
     # Read the file, fill the ticket numbers, create the dict, and the array
     @lines = []
     #this contains all the tickets in the file, so we don't issue a ticket twice
@@ -157,11 +166,6 @@ class Parsepaper
       end
       @lines << taskInstance
     }
-    
-    #and see what we should do...
-    if not self.respond_to?(@args[:mode].to_s)
-      puts "Unknown action: " << @args[:mode].to_s
-    end
   end
 
   def run
@@ -248,6 +252,9 @@ class Parsepaper
 
     #before we do anything, we decorate, so that all the new tickets get a valid number.
     self.decorate
+
+    #after this, we need to read the tickets again.
+    self.readTickets
 
     if self.arrayOfChanges.size == 0
       puts "No changes to commit"
