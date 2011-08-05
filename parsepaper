@@ -96,7 +96,7 @@ class Task
   alias_method :whitespace?, :whitespace
   alias_method :project?, :project
   def initialize(line)
-    @line = line.strip
+    @line = line.chomp
     @ticket = nil
     if /\#[0-9]{1,4}/.match(@line)
       @ticket = /\#([0-9]{1,4})/.match(@line)[1]
@@ -129,7 +129,7 @@ class Task
     # return the descrition of this ticket
     # means, we strip the - and the done
     desc = "Ticket: #{@ticket}\t\tStatus: #{'Done' if @done}"
-    return desc << "\n " << @line.mgsub([[/^\-/, ""], [/\ ?\@done/i, ""]]) 
+    return desc << "\n " << @line.mgsub([[/^\W*\-/, ""], [/\ ?\@done/i, ""]]) 
   end
 
 end
