@@ -25,6 +25,7 @@ class ParseArguments < Hash
     self[:ticket_numbers] = nil
     self[:force] = false
     self[:taskpaper_file] = 'todo.taskpaper'
+    self[:added_files_only] = false
 
     self[:possible_modes] = [:decorate, :commit, :status, :auto]
 
@@ -49,6 +50,10 @@ class ParseArguments < Hash
 
       opts.on('-t', '--taskpaper [TASKPAPERFILE]', 'chose a custom taskpaper file. default is todo.taskpaper') do |string|
         self[:taskpaper_file] = string 
+      end
+
+      opts.on('-a', '--addedfiles', 'just commit the files that have been added manually through git add') do |string|
+        self[:added_files_only] = true
       end
 
       opts.on('-f', '--force', 'in auto mode, force commit, and do not ask for approval') do
@@ -227,7 +232,11 @@ class Parsepaper
       commitMessage << ti.description << "\n"
     }
 
-    command = '/usr/bin/env git commit -a --file=-'
+    if @args[:added_files_only]
+      command = '/usr/bin/env git commit --file=-'
+    else
+      command = '/usr/bin/env git commit -a --file=-'
+    end
 
     result = nil
     IO.popen(command, mode='r+') do |io| 
